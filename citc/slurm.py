@@ -30,18 +30,12 @@ NODE_STATE_FLAGS = {
 
 
 class SlurmNode:
-    SINFO_FIELDS = [
-        "nodelist",
-        "statelong",
-        "reason",
-        "cpus",
-        "socketcorethread",
-        "memory",
-        "features",
-        "gres",
-        "nodeaddr",
-        "timestamp",
-    ]
+    SINFO_FIELDS = {
+        "nodelist": "%N",
+        "statelong": "%T",
+        "reason": "%E",
+        "features": "%f",
+    }
 
     name: str
     state: str
@@ -58,18 +52,13 @@ class SlurmNode:
 
     @classmethod
     def from_name(cls: Type["SlurmNode"], nodename: str) -> "SlurmNode":
-        field_width = 40
-        sinfo_format = ",".join(f"{f}:{field_width}" for f in cls.SINFO_FIELDS)
+        sinfo_format = "|".join(f"{k}:{v}" for (k,v) in cls.SINFO_FIELDS.items())
         out = subprocess.run(
-            ["sinfo", "--nodes", nodename, "--Format", sinfo_format, "--noheader"],
+            ["sinfo", "--nodes", nodename, "--format", sinfo_format, "--noheader"],
             timeout=5,
             stdout=subprocess.PIPE,
         ).stdout.decode()
-        fields = [
-            out[start : start + field_width].strip()
-            for start in range(0, len(out), field_width)
-        ]
-        data = {k: v for k, v in zip(cls.SINFO_FIELDS, fields)}
+        data = {k: v for (k,v) in [x.split(':', 1) for x in out.split('|')]}
         if data["statelong"][-1] in NODE_STATE_FLAGS:
             state = data["statelong"][:-1]
             state_flag: Optional[str] = data["statelong"][-1]
